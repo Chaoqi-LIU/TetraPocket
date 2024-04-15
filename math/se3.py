@@ -4,7 +4,7 @@ from typing import (
     Optional,
 )
 
-import matrix, so3
+import tensor, so3
 
 
 def linear_se3_interpolation(
@@ -52,9 +52,11 @@ def linear_se3_interpolation(
     )
 
     # Rn interpolation
-    pt = matrix.linear_Rn_interpolation(
+    pt = tensor.linear_tensor_interpolation(
         start[:, :3, 3], end[:, :3, 3],
+        batched=True,
         num_segment=num_segment, timestamps=timestamps,
+        padding_value=padding_value,
     )
 
     # concatenate

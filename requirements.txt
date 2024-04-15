@@ -1,0 +1,6 @@
+numpy
+torch
+drake
+open3d
+dgl     # or maybe pytorch3d?
+pillow
