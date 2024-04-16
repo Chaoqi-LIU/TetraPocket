@@ -4,7 +4,8 @@ from typing import (
     Optional,
 )
 
-import tensor, so3
+from tetrapocket.math import tensor, so3
+
 
 
 def linear_se3_interpolation(
@@ -75,9 +76,7 @@ def linear_se3_interpolation(
 
     return Xt
 
-
-
 if __name__ == '__main__':
     X0 = torch.rand(2, 4, 4)
     X1 = torch.rand(2, 4, 4)
-    print(linear_se3_interpolation(X0, X1, num_segment=torch.tensor([3, 1]), padding_value=np.inf))
+    Xt = linear_se3_interpolation(X0, X1, num_segment=torch.tensor([3, 1]), padding_value=np.inf)
