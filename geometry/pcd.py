@@ -23,3 +23,8 @@ def points_in_points_cvx_hull(
     return np.all(
         points0 @ cvx_hull.equations[:, :-1].T + cvx_hull.equations[:, -1] <= tol, axis=1
     )
+
+
+def farthest_point_sampling(
+    
+)
