@@ -4,7 +4,10 @@ from typing import (
     Optional,
 )
 
-from tetrapocket.math import tensor, so3
+from tetrapocket.math import (
+    tensor,
+    so3,
+)
 
 
 
