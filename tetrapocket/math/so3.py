@@ -21,6 +21,9 @@ def random_so3(
     Generate random SO(3) rotations.
     :param n: number of random rotations
     :param representation: representation, str, default 'rotation_matrix'
+    :param dtype: data type, torch.dtype
+    :param device: device, torch.device
+    :return: random SO(3) rotations in the specified representation
     """
     assert representation in ['rotation_matrix', 'quaternion', 'axis_angle', 'roll_pitch_yaw'], (
         f'invalid representation: {representation}'

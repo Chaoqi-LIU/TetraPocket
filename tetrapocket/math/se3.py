@@ -78,8 +78,3 @@ def linear_se3_interpolation(
         Xt = Xt.squeeze(0)
 
     return Xt
-
-if __name__ == '__main__':
-    X0 = torch.rand(2, 4, 4)
-    X1 = torch.rand(2, 4, 4)
-    Xt = linear_se3_interpolation(X0, X1, num_segment=torch.tensor([3, 1]), padding_value=np.inf)
