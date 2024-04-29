@@ -50,7 +50,7 @@ class Heightmap:
     def __init__(
         self,
         frames: torch.Tensor,
-        bboxs: torch.Tensor,
+        bboxes: torch.Tensor,
         heights: torch.Tensor,
         device: Optional[torch.device] = None,
     ) -> None:
@@ -59,7 +59,7 @@ class Heightmap:
         resolution, and the same size, i.e., heights[b].shape is the same for all b.
 
         :param frames SE(3), the center of the heightmap, (B, 4, 4).
-        :param bboxs Bounding box of the heightmap, (B, 2, 2). [lb_x, lb_y; ub_x, ub_y], 
+        :param bboxes Bounding box of the heightmap, (B, 2, 2). [lb_x, lb_y; ub_x, ub_y], 
                expressed in local frame.
         :param heights Height values, (B, X, Y). heights[b, x, y] is the 
                z-value at (lb_x + x * dx, lb_y + y * dy).
@@ -67,7 +67,7 @@ class Heightmap:
         """
         self.B_ = frames.shape[0]
         self.frames_W_L_ = frames
-        self.bboxs_ = bboxs
+        self.bboxes_ = bboxes
         self.heights_ = heights
         self.device_ = device
 
@@ -76,12 +76,28 @@ class Heightmap:
         self.X_: int = heights.shape[1]
         self.Y_: int = heights.shape[2]
         self.dimensions_: Tuple[torch.Tensor, torch.Tensor] = (
-            bboxs[:, 1, 0] - bboxs[:, 0, 0],    # ub_x - lb_x
-            bboxs[:, 1, 1] - bboxs[:, 0, 1]     # ub_y - lb_y
+            bboxes[:, 1, 0] - bboxes[:, 0, 0],    # ub_x - lb_x
+            bboxes[:, 1, 1] - bboxes[:, 0, 1]     # ub_y - lb_y
         )
         self.dx_ = self.dimensions_[0] / (self.X_ - 1)      # TODO: do we need to minus 1?
         self.dy_ = self.dimensions_[1] / (self.Y_ - 1)
 
+    
+    def to(self, device: torch.device) -> 'Heightmap':
+        """
+        Move the heightmap to another device.
+        :param device: Device to move to.
+        :return: Heightmap.
+        """
+        if self.device_ == device:
+            return self
+        return Heightmap(
+            self.frames_W_L_.to(device),
+            self.bboxes_.to(device),
+            self.heights_.to(device),
+            device=device
+        )
+    
     
     def indices_of(
         self,
@@ -237,12 +253,12 @@ class Heightmap:
         return self.frames_W_L_
     
 
-    def bboxs(self) -> torch.Tensor:
+    def bboxes(self) -> torch.Tensor:
         """
         Return the bounding boxes of the heightmap, in local frame.
         :return: Bounding boxes, (B, 2, 2).
         """
-        return self.bboxs_
+        return self.bboxes_
     
 
     def heights(self) -> torch.Tensor:
@@ -257,10 +273,10 @@ class Heightmap:
 if __name__ == '__main__':
     B = 2
     frames = torch.eye(4).repeat(B, 1, 1)
-    bboxs = torch.tensor([[-5, -5], [5, 5]]).repeat(B, 1, 1)
+    bboxes = torch.tensor([[-5, -5], [5, 5]]).repeat(B, 1, 1)
     heights = torch.rand(B, 1000, 1000)
     heights += 100
-    heightmap = Heightmap(frames, bboxs, heights)
+    heightmap = Heightmap(frames, bboxes, heights)
 
     points_W = torch.rand(2, 5, 3)
     mask = torch.tensor([1, 1], device=heightmap.device_, dtype=torch.bool)

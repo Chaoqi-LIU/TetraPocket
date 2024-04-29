@@ -8,6 +8,7 @@ from typing import (
     Tuple,
     Dict,
     Union,
+    overload,
 )
 
 
@@ -204,6 +205,117 @@ def rollpitchyaw_to_axis_angle(
     """
     assert rollpitchyaw.shape[-1] == 3, f'invalid roll-pitch-yaw has shape: {rollpitchyaw.shape[-1]}'
     return quaternion_to_axis_angle(rollpitchyaw_to_quaternion(rollpitchyaw))
+
+
+class Rotation3d:
+    """
+    A class to represent SO(3) rotations.
+    """
+    def __init__(self, data: torch.Tensor, representation: str) -> None:
+        """
+        Initialize the Rotation3d class.
+        :param data: rotation data, torch.Tensor
+        :param representation: representation, str
+        """
+        assert representation in ['rotation_matrix', 'quaternion', 'axis_angle', 'roll_pitch_yaw'], (
+            f'invalid representation: {representation}'
+            '\n(choose from "rotation_matrix", "quaternion", "axis_angle", "roll_pitch_yaw")'
+        )
+        self.data_ = data
+        self.representation_ = representation
+        self.device_ = data.device
+        self.dtype_ = data.dtype
+
+    def __repr__(self) -> str:
+        return f'Rotation3d(\n{self.data_}, \nrepresentation="{self.representation_}")'
+    
+    def data(self) -> torch.Tensor:
+        """
+        Get the rotation data.
+        :return: rotation data, torch.Tensor
+        """
+        return self.data_
+    
+    def representation(self) -> str:
+        """
+        Get the representation.
+        :return: representation, str
+        """
+        return self.representation_
+    
+    @overload
+    def to(self, representation: str) -> 'Rotation3d':
+        pass
+
+    @overload
+    def to(self, device: torch.device) -> 'Rotation3d':
+        pass
+
+    @overload
+    def to(self, representation: str, device: torch.device) -> 'Rotation3d':
+        pass
+
+    def to(self, *args) -> 'Rotation3d':
+        """
+        Convert the rotation to another representation or device.
+        :param representation: representation, str
+        :param device: device, torch.device
+        :return: converted rotation, Rotation3d
+
+        If already in the target representation and device, return self.
+        Otherwise, return the copy of the rotation in the target representation and device.
+        """
+        if len(args) == 1 and isinstance(args[0], str):
+            representation = args[0]
+            device = self.device_
+        elif len(args) == 1 and isinstance(args[0], torch.device):
+            representation = self.representation_
+            device = args[0]
+        elif len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], torch.device):
+            representation = args[0]
+            device = args[1]
+        else:
+            raise ValueError('invalid arguments')
+
+        if device == self.device_ and representation == self.representation_:
+            return self
+
+        # data conversion
+        if self.representation_ == 'rotation_matrix' and representation == 'quaternion':
+            data = rotation_matrix_to_quaternion(self.data_)
+        elif self.representation_ == 'rotation_matrix' and representation == 'axis_angle':
+            data = rotation_matrix_to_axis_angle(self.data_)
+        elif self.representation_ == 'rotation_matrix' and representation == 'roll_pitch_yaw':
+            data = rotation_matrix_to_rollpitchyaw(self.data_)
+        
+        elif self.representation_ == 'quaternion' and representation == 'rotation_matrix':
+            data = quaternion_to_rotation_matrix(self.data_)
+        elif self.representation_ == 'quaternion' and representation == 'axis_angle':
+            data = quaternion_to_axis_angle(self.data_)
+        elif self.representation_ == 'quaternion' and representation == 'roll_pitch_yaw':
+            data = quaternion_to_rollpitchyaw(self.data_)
+
+        elif self.representation_ == 'axis_angle' and representation == 'rotation_matrix':
+            data = axis_angle_to_rotation_matrix(self.data_)
+        elif self.representation_ == 'axis_angle' and representation == 'quaternion':
+            data = axis_angle_to_quaternion(self.data_)
+        elif self.representation_ == 'axis_angle' and representation == 'roll_pitch_yaw':
+            data = axis_angle_to_rollpitchyaw(self.data_)
+
+        elif self.representation_ == 'roll_pitch_yaw' and representation == 'rotation_matrix':
+            data = rollpitchyaw_to_rotation_matrix(self.data_)
+        elif self.representation_ == 'roll_pitch_yaw' and representation == 'quaternion':
+            data = rollpitchyaw_to_quaternion(self.data_)
+        elif self.representation_ == 'roll_pitch_yaw' and representation == 'axis_angle':
+            data = rollpitchyaw_to_axis_angle(self.data_)
+
+        else:
+            raise ValueError(f'cannot convert from {self.representation_} to {representation}')
+        
+        # to device
+        data = data.to(device)
+
+        return Rotation3d(data, representation)
 
 
 def linear_so3_interpolation(
