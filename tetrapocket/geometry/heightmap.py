@@ -1,10 +1,198 @@
+import scipy.interpolate
 import torch
+import scipy
 import numpy as np
-from typing import (
-    Optional,
-    Tuple,
-    Union,
-)
+import torch_scatter
+from typing import Optional, Tuple, Callable, Union, Sequence
+
+
+
+def gaussian_smoothing(
+    input: torch.Tensor,
+    dim: int,
+    kernel_size: Union[int, Sequence[int]],
+    sigma: Union[float, Sequence[float]],
+    stride: Optional[Union[int, Sequence[int]]] = 1,
+    padding: Optional[Union[int, Sequence[int]]] = 0,
+) -> torch.Tensor:
+    """
+    Apply gaussian smoothing to the input tensor.
+
+    :param input: Input tensor, (B, C, *data_dim).
+    :param dim: Dimension of the input data, only support 1D, 2D, 3D.
+    :param kernel_size: Kernel size of the gaussian kernel.
+    :param sigma: Standard deviation of the gaussian kernel.
+    :param stride: Stride of the convolution.
+    :param padding: Padding of the convolution.
+    :return: Smoothed tensor.
+    """
+
+    dtype = input.dtype
+    device = input.device
+    C = input.size(1)
+
+    if isinstance(kernel_size, int):
+        kernel_size = [kernel_size] * dim
+    if isinstance(sigma, float):
+        sigma = [sigma] * dim
+
+    kernel: torch.Tensor = 1
+    meshgrids = torch.meshgrid([
+        torch.arange(size, dtype=dtype, device=device) 
+        for size in kernel_size
+    ], indexing='ij')
+    for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
+        mu = (size - 1) / 2
+        kernel *= 1 / (std * np.sqrt(2 * np.pi)) * torch.exp(-((mgrid - mu) / std) ** 2 / 2)
+    kernel = kernel / kernel.sum()
+
+    # reshape kernel to depthwise conv
+    kernel = kernel.view(1, 1, *kernel.size())
+    kernel = kernel.repeat(C, *[1] * (kernel.dim() - 1))
+
+    if dim == 1:    conv = torch.nn.functional.conv1d
+    elif dim == 2:  conv = torch.nn.functional.conv2d
+    elif dim == 3:  conv = torch.nn.functional.conv3d
+    else:           raise ValueError(f"Unsupported dim: {dim}")
+    
+    return conv(input, weight=kernel, groups=C, stride=stride, padding=padding)
+
+
+
+def interpolate_2d_map_(
+    maps: torch.Tensor,
+    masks: torch.Tensor,
+    method: Optional[str] = 'linear',
+) -> torch.Tensor:
+    """
+    Interpolate grid values for grids in `mask`, inplace version.
+
+    :param maps: Grid values, (..., X, Y).
+    :param masks: Mask, (..., X, Y), True if the grid needs to be interpolated.
+    :param method: Interpolation method, 'linear' or 'nearest' or 'cubic'.
+    :return: Interpolated map, (..., X, Y).
+    """
+    dtype = maps.dtype
+    device = maps.device
+    X, Y = maps.shape[-2:]
+    pre_dims = maps.shape[:-2]
+    maps = maps.view(-1, X, Y)
+    masks = masks.view(-1, X, Y)
+
+    for i in range(pre_dims.numel()):
+        valid_grid = ~masks[i]
+        maps[i, ~valid_grid] = torch.from_numpy(
+            scipy.interpolate.griddata(
+                torch.nonzero(valid_grid).to(dtype=dtype).cpu().numpy(),
+                maps[i, valid_grid].cpu().numpy(),
+                torch.nonzero(~valid_grid).to(dtype=dtype).cpu().numpy(),
+                method=method
+            )
+        ).to(dtype=dtype, device=device)
+
+    return maps.view(*pre_dims, X, Y)
+
+
+
+def interpolate_2d_map(
+    maps: torch.Tensor,
+    masks: torch.Tensor,
+    method: Optional[str] = 'linear',
+) -> torch.Tensor:
+    """
+    Interpolate grid values for grids in `mask`, return a new tensor.
+
+    :param maps: Grid values, (..., X, Y).
+    :param masks: Mask, (..., X, Y), True if the grid needs to be interpolated.
+    :param method: Interpolation method, 'linear' or 'nearest' or 'cubic'.
+    :return: Interpolated map, (..., X, Y).
+    """
+    dtype = maps.dtype
+    device = maps.device
+    X, Y = maps.shape[-2:]
+    pre_dims = maps.shape[:-2]
+    new_maps = maps.clone().view(-1, X, Y)
+    masks = masks.view(-1, X, Y)
+
+    for i in range(pre_dims.numel()):
+        valid_grid = ~masks[i]
+        new_maps[i, ~valid_grid] = torch.from_numpy(
+            scipy.interpolate.griddata(
+                torch.nonzero(valid_grid).to(dtype=dtype).cpu().numpy(),
+                maps[i, valid_grid].cpu().numpy(),
+                torch.nonzero(~valid_grid).to(dtype=dtype).cpu().numpy(),
+                method=method
+            )
+        ).to(dtype=dtype, device=device)
+
+    return new_maps.view(*pre_dims, X, Y)
+
+
+
+def scatter_3d_points(
+    points: torch.Tensor,
+    to_index: Callable,
+    map_size: Tuple[int, int],
+    mask: Optional[torch.Tensor] = None,
+    padding: Optional[float] = float('nan'),
+    reduce: Optional[str] = 'max',
+) -> torch.Tensor:
+    """
+    Scatter 3D points to a 2D grid.
+
+    :param points: Points, (..., N, 3), N is the number of points.
+    :param to_index: Function to convert points to indices in the grid, if
+           the point is out of bound, will be ignored.
+    :param map_size: Size of the grid, (X, Y).
+    :param mask: Mask, (..., N), 1 if the point is valid, 0 otherwise.
+    :param padding: Padding value, if the grid is not filled.
+    :param reduce: Reduce method, one of 'max', 'mean', 'std', 'sum', 'min', 
+           'mul', 'logsumexp', 'softmax', 'log_softmax', 'count'.
+    :return: Grid, (..., X, Y).
+    """
+    dtype = points.dtype
+    device = points.device
+    pre_dims = points.shape[:-2]
+    X, Y = map_size
+
+    # def scatter function
+    if reduce == 'max':             scatter_fn = torch_scatter.scatter_max
+    elif reduce == 'mean':          scatter_fn = torch_scatter.scatter_mean
+    elif reduce == 'std':           scatter_fn = torch_scatter.scatter_std
+    elif reduce == 'sum':           scatter_fn = torch_scatter.scatter_sum
+    elif reduce == 'min':           scatter_fn = torch_scatter.scatter_min
+    elif reduce == 'mul':           scatter_fn = torch_scatter.scatter_mul
+    elif reduce == 'logsumexp':     scatter_fn = torch_scatter.scatter_logsumexp
+    elif reduce == 'softmax':       scatter_fn = torch_scatter.scatter_softmax
+    elif reduce == 'log_softmax':   scatter_fn = torch_scatter.scatter_log_softmax
+    elif reduce == 'count':         pass
+    else:                           
+        raise ValueError(f"Unsupported reduce method: {reduce}, check with `help`")
+
+    # indexing
+    i, j = to_index(points)
+    valid_mask = (i >= 0) & (i < X) & (j >= 0) & (j < Y) & (mask if mask is not None else 1)
+    idx = i * Y + j
+    idx += (torch.arange(torch.prod(torch.tensor(pre_dims)), device=device) * X * Y).view(*pre_dims, 1, 1)
+
+    # count map has special treatment
+    if reduce == 'count':
+        maps = torch.zeros((*pre_dims, X, Y), dtype=dtype, device=device)
+        maps.view(-1).index_add_(0, idx[valid_mask], torch.ones_like(idx[valid_mask]))
+        return maps
+
+    # other reduce methods
+    maps = torch.full((*pre_dims, X, Y), float('nan'), dtype=dtype, device=device)
+    z_val, z_arg = scatter_fn(points[valid_mask][..., 2], idx[valid_mask])
+    to_remove = z_arg == idx[valid_mask].size(-1)
+    z_val = z_val[~to_remove]
+    z_arg = z_arg[~to_remove]
+    maps.view(-1)[idx[valid_mask][z_arg]] = z_val
+
+    # padding
+    maps[torch.isnan(maps)] = padding
+
+    return maps
 
 
 
