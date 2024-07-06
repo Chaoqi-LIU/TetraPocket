@@ -1,17 +1,9 @@
 import numpy as np
 import torch
 import time
-from pydrake.geometry.optimization import (
-    HPolyhedron,
-)
-from pydrake.common import (
-    RandomGenerator,
-)
-from typing import (
-    Optional,
-    Union,
-    List,
-)
+from pydrake.geometry.optimization import HPolyhedron
+from pydrake.common import RandomGenerator
+from typing import Optional
 
 
 
@@ -19,7 +11,7 @@ def uniform_sample_in_hpolyhedron(
     hpoly: HPolyhedron,
     num_samples: int,
     seed: Optional[int] = None,
-    method: Optional[str] = 'mcmc'
+    method: str = 'mcmc'
 ) -> np.ndarray:
     """
     Uniform sample in half-space polyhedron.

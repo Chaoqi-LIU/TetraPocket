@@ -1,9 +1,7 @@
 import open3d
 import numpy as np
 import os
-from typing import (
-    Optional,
-)
+from typing import Optional
 
 
 

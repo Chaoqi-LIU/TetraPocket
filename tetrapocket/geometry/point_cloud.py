@@ -2,11 +2,7 @@ import scipy
 import numpy as np
 import torch
 import pytorch3d
-from typing import (
-    Optional,
-    Union,
-    List,
-)
+from typing import Optional, Union
 
 
 
@@ -37,8 +33,8 @@ def farthest_point_sampling(
     K: Union[int, float, torch.Tensor],
     lengths: Optional[torch.Tensor] = None,
     random_start_point: bool = False,
-    return_pts: Optional[bool] = True,
-    return_idx: Optional[bool] = True,
+    return_pts: bool = True,
+    return_idx: bool = True,
 ) -> torch.Tensor:
     """
     Iterative farthest point sampling algorithm [1] to subsample a set of

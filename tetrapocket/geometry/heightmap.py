@@ -12,8 +12,8 @@ def gaussian_smoothing(
     dim: int,
     kernel_size: Union[int, Sequence[int]],
     sigma: Union[float, Sequence[float]],
-    stride: Optional[Union[int, Sequence[int]]] = 1,
-    padding: Optional[Union[int, Sequence[int]]] = 0,
+    stride: Union[int, Sequence[int]] = 1,
+    padding: Union[int, Sequence[int]] = 0,
 ) -> torch.Tensor:
     """
     Apply gaussian smoothing to the input tensor.
@@ -62,7 +62,7 @@ def gaussian_smoothing(
 def interpolate_2d_map_(
     maps: torch.Tensor,
     masks: torch.Tensor,
-    method: Optional[str] = 'linear',
+    method: str = 'linear',
 ) -> torch.Tensor:
     """
     Interpolate grid values for grids in `mask`, inplace version.
@@ -97,7 +97,7 @@ def interpolate_2d_map_(
 def interpolate_2d_map(
     maps: torch.Tensor,
     masks: torch.Tensor,
-    method: Optional[str] = 'linear',
+    method: str = 'linear',
 ) -> torch.Tensor:
     """
     Interpolate grid values for grids in `mask`, return a new tensor.
@@ -133,9 +133,9 @@ def scatter_3d_points(
     points: torch.Tensor,
     to_index: Callable,
     map_size: Tuple[int, int],
-    mask: Optional[torch.Tensor] = None,
-    padding: Optional[float] = float('nan'),
-    reduce: Optional[str] = 'max',
+    mask: torch.Tensor = None,
+    padding: float = float('nan'),
+    reduce: str = 'max',
 ) -> torch.Tensor:
     """
     Scatter 3D points to a 2D grid.
@@ -291,8 +291,8 @@ class Heightmap:
         self,
         points: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-        frames: Optional[str] = 'world',
-        return_residue: Optional[bool] = False
+        frames: str = 'world',
+        return_residue: bool = False
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
         Return the indices of the points in the heightmap.
@@ -334,8 +334,8 @@ class Heightmap:
         self, 
         points: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-        frames: Optional[str] = 'world',
-        interpolation: Optional[str] = 'bilinear'
+        frames: str = 'world',
+        interpolation: str = 'bilinear'
     ) -> torch.Tensor:
         """
         Query the height value at the points.

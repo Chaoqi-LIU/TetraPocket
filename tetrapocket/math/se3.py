@@ -1,13 +1,7 @@
 import torch
-import numpy as np
-from typing import (
-    Optional,
-)
+from typing import Optional
 
-from tetrapocket.math import (
-    tensor,
-    so3,
-)
+from tetrapocket.math import tensor, so3
 
 
 
@@ -16,7 +10,7 @@ def linear_se3_interpolation(
     end: torch.Tensor,                           # (*, 4, 4)
     num_segment: Optional[torch.Tensor] = None,  # (*,)
     timestamps: Optional[torch.Tensor] = None,   # (*, max_num_waypoints)
-    padding_value: Optional[float] = float('nan'),
+    padding_value: float = float('nan'),
 ) -> torch.Tensor:              # (*, max_num_waypoints, 4, 4)
     """
     Linear interpolation on SE(3).

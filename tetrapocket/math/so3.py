@@ -1,20 +1,12 @@
 import pytorch3d.transforms
 import torch
-import numpy as np
 import pytorch3d
-from typing import (
-    Optional,
-    List,
-    Tuple,
-    Dict,
-    Union,
-    overload,
-)
+from typing import Optional, overload
 
 
 def random_so3(
     n: int,
-    representation: Optional[str] = 'rotation_matrix',
+    representation: str = 'rotation_matrix',
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
@@ -323,8 +315,8 @@ def linear_so3_interpolation(
     end: torch.Tensor,                           # (*, ...)
     num_segment: Optional[torch.Tensor] = None,  # (*,)
     timestamps: Optional[torch.Tensor] = None,   # (*, max_num_waypoints)
-    representation: Optional[str] = 'rotation_matrix',
-    padding_value: Optional[float] = float('nan'),
+    representation: str = 'rotation_matrix',
+    padding_value: float = float('nan'),
 ) -> torch.Tensor:              # (*, max_num_waypoints, ...)
     """
     Linear interpolation on SO(3).
